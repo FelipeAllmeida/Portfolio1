@@ -5,11 +5,6 @@ using UnityEngine.Events;
 
 namespace Vox
 {
-    public class InputEvent<T> : UnityEvent<T> where T : InputInfo
-    {
-
-    }
-
     public enum InputPhases
     {
         START,
@@ -19,8 +14,32 @@ namespace Vox
 
     public class InputInfo
     {
-        public InputPhases Phase { get; internal set; }
-        public Vector2 ScreenPoint { get; internal set; }
-        public RayInfo RayInfo { get; internal set; }
+        public InputInfo(KeyCode p_keyCode, InputPhases p_phase, Vector2 p_screenPoint, RayInfo p_rayInfo)
+        {
+            KeyCode = p_keyCode;
+            Phase = p_phase;
+            ScreenPoint = p_screenPoint;
+            RayInfo = p_rayInfo;
+        }
+
+        public KeyCode KeyCode { get; private set; }
+        public InputPhases Phase { get; private set; }
+        public Vector2 ScreenPoint { get; private set; }
+        public RayInfo RayInfo { get; private set; }
+
+        public void SetPhase(InputPhases p_phase)
+        {
+            Phase = p_phase;
+        }
+
+        public void SetScreenPoint(Vector2 p_screenPoint)
+        {
+            ScreenPoint = p_screenPoint;
+        }
+
+        public void SetRayInfo(RayInfo p_rayInfo)
+        {
+            RayInfo = p_rayInfo;
+        }
     }
 }

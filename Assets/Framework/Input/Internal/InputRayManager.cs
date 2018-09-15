@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 
-namespace Vox.Internal
+namespace Vox
 {
     public class InputRayManager : MonoBehaviour
     {

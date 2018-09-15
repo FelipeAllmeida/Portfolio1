@@ -1,28 +1,40 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
-namespace Vox.Internal
+namespace Vox
 {
+    public enum MouseKeyCode
+    {
+        Mouse0 = 323,
+        Mouse1 = 324,
+        Mouse2 = 325,
+        Mouse3 = 326,
+        Mouse4 = 327,
+        Mouse5 = 328,
+        Mouse6 = 329,
+    }
+
+    public static class InputDefaults
+    {
+        public readonly static List<MouseKeyCode> ListDefaultMouseKeyCodes = new List<MouseKeyCode> { { MouseKeyCode.Mouse0 }, { MouseKeyCode.Mouse1 } };
+    }
     public class InputManager
     {
         public InputManager()
         {
-            _listMouseKeyCodes = new List<MouseKeyCode> { { MouseKeyCode.Mouse0 }, { MouseKeyCode.Mouse1 } };
+            ListListenedMouseKeyCodes = InputDefaults.ListDefaultMouseKeyCodes;
         }
 
-        public enum MouseKeyCode
+        public InputManager(List<MouseKeyCode> p_listenedMouseKeyCodes)
         {
-            Mouse0 = 323,
-            Mouse1 = 324,
-            Mouse2 = 325,
-            Mouse3 = 326,
-            Mouse4 = 327,
-            Mouse5 = 328,
-            Mouse6 = 329,
+            ListListenedMouseKeyCodes = p_listenedMouseKeyCodes;
         }
 
-        [SerializeField] private List<MouseKeyCode> _listMouseKeyCodes;
-        [SerializeField] private List<KeyCode> _listKeyboard;
+        public List<MouseKeyCode> ListListenedMouseKeyCodes;
+
+        public bool interactable = true;
+        public bool raycastMouseEnabled = true;
 
         /// <summary>
         /// The input default camera. If null, Camera.main will be used instead.
@@ -52,74 +64,78 @@ namespace Vox.Internal
         private Dictionary<int, InputInfo> _dictInputs = new Dictionary<int, InputInfo>();
 
         /// <summary>
-        /// Callback called after a mouse input. It retuns a InputInfo.
+        /// Callback called after a input. It retuns a InputInfo.
         /// </summary>
-        public InputEvent<InputInfo> onMouseClick;
+        public event Action<InputInfo> onInput;
 
         public void CheckInputs()
         {
+            if (interactable == false) return;
+
             CheckMouseInputs();
         }
 
         #region Internal
         private void CheckMouseInputs()
         {            
-            for (int i = 0; i < _listMouseKeyCodes.Count; i ++)
+            if (ListListenedMouseKeyCodes != null)
             {
-                if (Input.GetKeyDown((KeyCode)_listMouseKeyCodes[i]))
+                for (int i = 0; i < ListListenedMouseKeyCodes.Count; i ++)
                 {
-                    HandleKey((int)_listMouseKeyCodes[i], InputPhases.START);
-                }
-                else if (Input.GetKey((KeyCode)_listMouseKeyCodes[i]))
-                {
-                    HandleKey((int)_listMouseKeyCodes[i], InputPhases.UPDATE);
+                    if (Input.GetKeyDown((KeyCode)ListListenedMouseKeyCodes[i]))
+                    {
+                        HandleKey((int)ListListenedMouseKeyCodes[i], InputPhases.START, raycastMouseEnabled);
+                    }
+                    else if (Input.GetKey((KeyCode)ListListenedMouseKeyCodes[i]))
+                    {
+                        HandleKey((int)ListListenedMouseKeyCodes[i], InputPhases.UPDATE, raycastMouseEnabled);
 
-                }
-                else if (Input.GetKeyUp((KeyCode)_listMouseKeyCodes[i]))
-                {
-                    HandleKey((int)_listMouseKeyCodes[i], InputPhases.FINISH);
+                    }
+                    else if (Input.GetKeyUp((KeyCode)ListListenedMouseKeyCodes[i]))
+                    {
+                        HandleKey((int)ListListenedMouseKeyCodes[i], InputPhases.FINISH, raycastMouseEnabled);
+                    }
                 }
             }
         }
 
-        private void HandleKey(int p_inputID, InputPhases p_phase)
+        private void HandleKey(int p_inputID, InputPhases p_phase, bool p_useRaycast)
         {
             if (p_phase == InputPhases.FINISH)
             {
                 if (_dictInputs.ContainsKey(p_inputID))
                 {
-                    InputInfo __inputInfo = UpdateInputInfo(p_inputID, p_phase);
+                    InputInfo __inputInfo = UpdateInputInfo(p_inputID, p_phase, p_useRaycast);
                     _dictInputs.Remove(p_inputID);
-                    onMouseClick?.Invoke(__inputInfo);
+                    onInput?.Invoke(__inputInfo);
                 }
             }
             else if (p_phase == InputPhases.UPDATE)
             {
-                onMouseClick?.Invoke(UpdateInputInfo(p_inputID, p_phase));
+                onInput?.Invoke(UpdateInputInfo(p_inputID, p_phase, p_useRaycast));
             }
             else if (p_phase == InputPhases.START)
             {
-                InputInfo __inputInfo = CreateInputInfo(p_phase);
+                InputInfo __inputInfo = CreateInputInfo((KeyCode)p_inputID, p_phase, p_useRaycast);
                 _dictInputs.Add(p_inputID, __inputInfo);
-                onMouseClick?.Invoke(__inputInfo);
+                onInput?.Invoke(__inputInfo);
             }
         }
 
-        private InputInfo CreateInputInfo(InputPhases p_phase)
+        private InputInfo CreateInputInfo(KeyCode p_keyCode, InputPhases p_phase, bool p_useRaycast)
         { 
             Vector2 __mousePosition = Input.mousePosition;
 
-            InputInfo __inputInfo = new InputInfo
-            {
-                Phase = p_phase,
-                ScreenPoint = __mousePosition,
-                RayInfo = (InputRayManager != null) ? InputRayManager.CreateRayInfo(viewCamera, __mousePosition) : null
-            };
+            InputInfo __inputInfo = new InputInfo(
+                p_keyCode,
+                p_phase,
+                __mousePosition,
+                (InputRayManager != null && p_useRaycast) ? InputRayManager.CreateRayInfo(viewCamera, __mousePosition) : null);
 
             return __inputInfo;
         }
 
-        private InputInfo UpdateInputInfo(int p_inputID, InputPhases p_phase)
+        private InputInfo UpdateInputInfo(int p_inputID, InputPhases p_phase, bool p_useRaycast)
         {
             InputInfo __inputInfo = null;
 
@@ -127,9 +143,9 @@ namespace Vox.Internal
             {
                 Vector2 __mousePosition = Input.mousePosition;
 
-                _dictInputs[p_inputID].Phase = p_phase;
-                _dictInputs[p_inputID].ScreenPoint = __mousePosition;
-                _dictInputs[p_inputID].RayInfo = (InputRayManager != null) ? InputRayManager.CreateRayInfo(viewCamera, __mousePosition) : null;
+                _dictInputs[p_inputID].SetPhase(p_phase);
+                _dictInputs[p_inputID].SetScreenPoint(__mousePosition);
+                _dictInputs[p_inputID].SetRayInfo((InputRayManager != null && p_useRaycast) ? InputRayManager.CreateRayInfo(viewCamera, __mousePosition) : null);
             }
 
             return __inputInfo;
